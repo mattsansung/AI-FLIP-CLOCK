@@ -1,0 +1,406 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#090b0d">
+  <title>24 小时篮球翻页钟</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #080a0c;
+      --panel: #14181b;
+      --panel-deep: #090b0d;
+      --line: rgba(255, 255, 255, .1);
+      --orange: #ff6a00;
+      --orange-soft: #ff9b52;
+      --digit: #fff7e8;
+      --muted: #8a9298;
+      --flip-time: 520ms;
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body { min-height: 100%; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      overflow: hidden;
+      background:
+        radial-gradient(circle at 50% 15%, rgba(255, 106, 0, .13), transparent 32rem),
+        linear-gradient(135deg, transparent 49.7%, rgba(255,255,255,.025) 50%, transparent 50.3%),
+        var(--bg);
+      color: white;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      opacity: .22;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 180 180' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.2'/%3E%3C/svg%3E");
+      mix-blend-mode: soft-light;
+    }
+
+    .court-line {
+      position: fixed;
+      width: min(74vw, 760px);
+      aspect-ratio: 1;
+      border: 1px solid rgba(255, 106, 0, .09);
+      border-radius: 50%;
+      pointer-events: none;
+    }
+
+    .scoreboard {
+      position: relative;
+      width: min(1080px, calc(100vw - 40px));
+      padding: clamp(20px, 4vw, 48px);
+      border: 1px solid #343a3f;
+      border-radius: 18px;
+      background:
+        linear-gradient(115deg, rgba(255,255,255,.045), transparent 22%),
+        linear-gradient(180deg, #1a1e21 0%, #101315 100%);
+      box-shadow:
+        0 28px 80px rgba(0,0,0,.55),
+        inset 0 1px rgba(255,255,255,.09),
+        inset 0 -1px rgba(0,0,0,.8);
+    }
+
+    .scoreboard::before,
+    .scoreboard::after {
+      content: "";
+      position: absolute;
+      top: 18px;
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #050606;
+      box-shadow: inset 0 1px 1px rgba(255,255,255,.12);
+    }
+
+    .scoreboard::before { left: 18px; }
+    .scoreboard::after { right: 18px; }
+
+    .scoreboard__header,
+    .scoreboard__footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+    }
+
+    .eyebrow,
+    .period,
+    .footer-label {
+      margin: 0;
+      font-size: clamp(.64rem, 1.3vw, .78rem);
+      font-weight: 800;
+      letter-spacing: .22em;
+      text-transform: uppercase;
+    }
+
+    .eyebrow { color: var(--orange-soft); }
+    .period, .footer-label { color: var(--muted); }
+
+    .period span {
+      display: inline-grid;
+      place-items: center;
+      width: 28px;
+      height: 28px;
+      margin-left: 8px;
+      border: 1px solid rgba(255,106,0,.28);
+      border-radius: 50%;
+      color: var(--orange-soft);
+      letter-spacing: 0;
+    }
+
+    .clock {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: clamp(5px, 1.1vw, 13px);
+      margin: clamp(22px, 4vw, 40px) 0;
+      perspective: 1200px;
+    }
+
+    .digit-group {
+      display: flex;
+      gap: clamp(5px, .9vw, 10px);
+    }
+
+    .flip-card {
+      --radius: clamp(6px, 1vw, 11px);
+      position: relative;
+      width: clamp(49px, 10.2vw, 104px);
+      height: clamp(76px, 15vw, 154px);
+      border-radius: var(--radius);
+      background: #050607;
+      box-shadow:
+        0 10px 20px rgba(0,0,0,.38),
+        0 0 0 1px rgba(255,255,255,.06);
+      font-family: "Arial Narrow", "Roboto Condensed", Impact, sans-serif;
+      font-size: clamp(3.4rem, 10.5vw, 7.6rem);
+      font-weight: 900;
+      font-variant-numeric: tabular-nums;
+      line-height: 1;
+      color: var(--digit);
+    }
+
+    .card-half,
+    .flip-leaf {
+      position: absolute;
+      left: 0;
+      width: 100%;
+      height: 50%;
+      overflow: hidden;
+      backface-visibility: hidden;
+      background:
+        linear-gradient(110deg, rgba(255,255,255,.035), transparent 35%),
+        var(--panel-deep);
+    }
+
+    .card-half span,
+    .flip-leaf span {
+      position: absolute;
+      left: 0;
+      width: 100%;
+      height: 200%;
+      display: grid;
+      place-items: center;
+      text-shadow: 0 0 18px rgba(255,247,232,.09);
+    }
+
+    .card-half--top,
+    .flip-leaf--top {
+      top: 0;
+      border-radius: var(--radius) var(--radius) 3px 3px;
+      border-bottom: 1px solid #000;
+    }
+
+    .card-half--top span,
+    .flip-leaf--top span { top: 0; }
+
+    .card-half--bottom,
+    .flip-leaf--bottom {
+      bottom: 0;
+      border-radius: 3px 3px var(--radius) var(--radius);
+      border-top: 1px solid rgba(255,255,255,.045);
+    }
+
+    .card-half--bottom span,
+    .flip-leaf--bottom span { bottom: 0; }
+
+    .flip-card::after {
+      content: "";
+      position: absolute;
+      z-index: 8;
+      top: calc(50% - 1px);
+      left: -2px;
+      right: -2px;
+      height: 2px;
+      background: rgba(0,0,0,.82);
+      box-shadow: 0 1px rgba(255,255,255,.035);
+      pointer-events: none;
+    }
+
+    .flip-leaf--top {
+      z-index: 6;
+      transform-origin: bottom;
+      animation: fold-up calc(var(--flip-time) * .5) cubic-bezier(.52,.04,.91,.35) forwards;
+    }
+
+    .flip-leaf--bottom {
+      z-index: 5;
+      transform: rotateX(90deg);
+      transform-origin: top;
+      animation: fold-down calc(var(--flip-time) * .5) cubic-bezier(.15,.62,.35,1) calc(var(--flip-time) * .5) forwards;
+    }
+
+    @keyframes fold-up {
+      from { transform: rotateX(0); filter: brightness(1); }
+      to { transform: rotateX(-90deg); filter: brightness(.48); }
+    }
+
+    @keyframes fold-down {
+      from { transform: rotateX(90deg); filter: brightness(.48); }
+      to { transform: rotateX(0); filter: brightness(1); }
+    }
+
+    .colon {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      gap: clamp(12px, 2.5vw, 28px);
+      height: clamp(76px, 15vw, 154px);
+      padding: 0 clamp(0px, .4vw, 5px);
+    }
+
+    .colon::before,
+    .colon::after {
+      content: "";
+      width: clamp(6px, 1.1vw, 11px);
+      aspect-ratio: 1;
+      border-radius: 50%;
+      background: var(--orange);
+      box-shadow: 0 0 12px rgba(255,106,0,.8), 0 0 28px rgba(255,106,0,.36);
+    }
+
+    .scoreboard__footer {
+      padding-top: 18px;
+      border-top: 1px solid var(--line);
+    }
+
+    .live {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      color: #b9c0c4;
+      font-size: .72rem;
+      font-weight: 750;
+      letter-spacing: .14em;
+    }
+
+    .live::before {
+      content: "";
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--orange);
+      box-shadow: 0 0 10px rgba(255,106,0,.8);
+      animation: pulse 2s ease-in-out infinite;
+    }
+
+    @keyframes pulse { 50% { opacity: .42; } }
+
+    @media (max-width: 680px) {
+      body { align-items: center; }
+      .scoreboard {
+        width: calc(100vw - 20px);
+        padding: 22px 12px 18px;
+        border-radius: 13px;
+      }
+      .clock { gap: 4px; }
+      .digit-group { gap: 3px; }
+      .flip-card { width: clamp(42px, 13vw, 82px); height: clamp(65px, 20vw, 122px); font-size: clamp(3rem, 13.8vw, 6rem); }
+      .colon { height: clamp(65px, 20vw, 122px); }
+      .period { display: none; }
+    }
+
+    @media (max-width: 390px) {
+      .flip-card { width: 41px; height: 63px; font-size: 2.9rem; }
+      .colon { height: 63px; gap: 10px; }
+      .scoreboard__footer { padding-top: 14px; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; }
+    }
+  </style>
+</head>
+<body>
+  <div class="court-line" aria-hidden="true"></div>
+
+  <main class="scoreboard" aria-label="24 小时制翻页时钟">
+    <header class="scoreboard__header">
+      <p class="eyebrow">Game Clock · 比赛时钟</p>
+      <p class="period">Period <span>4</span></p>
+    </header>
+
+    <div class="clock" role="timer" aria-live="off" aria-label="当前时间">
+      <div class="digit-group" data-group="hours" aria-label="时">
+        <div class="flip-card" data-index="0"></div>
+        <div class="flip-card" data-index="1"></div>
+      </div>
+      <div class="colon" aria-hidden="true"></div>
+      <div class="digit-group" data-group="minutes" aria-label="分">
+        <div class="flip-card" data-index="2"></div>
+        <div class="flip-card" data-index="3"></div>
+      </div>
+      <div class="colon" aria-hidden="true"></div>
+      <div class="digit-group" data-group="seconds" aria-label="秒">
+        <div class="flip-card" data-index="4"></div>
+        <div class="flip-card" data-index="5"></div>
+      </div>
+    </div>
+
+    <footer class="scoreboard__footer">
+      <span class="footer-label">24 Hour</span>
+      <span class="live">Local Time</span>
+    </footer>
+  </main>
+
+  <script>
+    const cards = [...document.querySelectorAll('.flip-card')];
+    const clock = document.querySelector('.clock');
+    let previous = '';
+
+    function cardMarkup(value) {
+      return `
+        <div class="card-half card-half--top"><span>${value}</span></div>
+        <div class="card-half card-half--bottom"><span>${value}</span></div>`;
+    }
+
+    function setInitialTime(value) {
+      cards.forEach((card, index) => {
+        card.innerHTML = cardMarkup(value[index]);
+        card.dataset.value = value[index];
+      });
+    }
+
+    function flip(card, nextValue) {
+      const oldValue = card.dataset.value;
+      if (oldValue === nextValue) return;
+
+      card.dataset.value = nextValue;
+      card.querySelector('.card-half--top span').textContent = nextValue;
+
+      const topLeaf = document.createElement('div');
+      topLeaf.className = 'flip-leaf flip-leaf--top';
+      topLeaf.innerHTML = `<span>${oldValue}</span>`;
+
+      const bottomLeaf = document.createElement('div');
+      bottomLeaf.className = 'flip-leaf flip-leaf--bottom';
+      bottomLeaf.innerHTML = `<span>${nextValue}</span>`;
+
+      card.append(topLeaf, bottomLeaf);
+
+      topLeaf.addEventListener('animationend', () => topLeaf.remove(), { once: true });
+      bottomLeaf.addEventListener('animationend', () => {
+        card.querySelector('.card-half--bottom span').textContent = nextValue;
+        bottomLeaf.remove();
+      }, { once: true });
+    }
+
+    function getTimeString() {
+      const now = new Date();
+      return [now.getHours(), now.getMinutes(), now.getSeconds()]
+        .map(unit => String(unit).padStart(2, '0'))
+        .join('');
+    }
+
+    function updateClock() {
+      const current = getTimeString();
+
+      if (!previous) {
+        setInitialTime(current);
+      } else if (current !== previous) {
+        cards.forEach((card, index) => flip(card, current[index]));
+      }
+
+      previous = current;
+      clock.setAttribute('aria-label', `${current.slice(0,2)} 时 ${current.slice(2,4)} 分 ${current.slice(4)} 秒`);
+
+      // 对齐到下一秒边界，避免 setInterval 长时间运行后漂移。
+      const delay = 1000 - (Date.now() % 1000) + 12;
+      window.setTimeout(updateClock, delay);
+    }
+
+    updateClock();
+  </script>
+</body>
+</html>
